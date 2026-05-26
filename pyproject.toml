@@ -1,0 +1,31 @@
+[project]
+name = "autofi"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.4.1",
+    "python-dateutil>=2.9.0.post0",
+    "sqlmodel>=0.0.38",
+]
+
+[project.scripts]
+autofi = "cli.main:autofi"
+
+[tool.uv]
+package = true
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.15.14",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
