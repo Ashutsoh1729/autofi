@@ -14,8 +14,9 @@ AutoFi is an AI-powered system that ingests bank transactions, categorises them,
 | Transaction storage & queries | ✅ Done |
 | Duplicate detection | ✅ Done |
 | CLI (`bank import`, `tx list`, etc.) | ✅ Done |
-| Agent system (Orchestrator + Bookkeeper) | 🔧 In progress |
-| Chat interface (`autofi chat`) | 🔧 In progress |
+| `autofi setup` (interactive LLM config) | ✅ Done |
+| Agent system (Orchestrator + Bookkeeper) | ✅ Done |
+| Chat interface (`autofi chat`) | ✅ Done |
 
 ---
 
@@ -59,6 +60,23 @@ uv run autofi tx show <id>
 uv run autofi tx stats
 ```
 
+### Configure LLM
+
+```sh
+# Interactive wizard: pick provider, model, enter API key
+uv run autofi setup
+```
+
+### Chat with AI agents
+
+```sh
+# Single-turn query
+uv run autofi chat "How much did I spend on groceries last month?"
+
+# Interactive REPL
+uv run autofi chat -i
+```
+
 ### Manage accounts
 
 ```sh
@@ -86,17 +104,21 @@ CSV files with BOM, quoted fields, commas in amounts, empty rows, and currency s
 
 ```
 ┌──────────────────────┐
-│     User (Chat)       │
+│     User (Chat/CLI)   │
 └─────────┬────────────┘
           │
 ┌─────────▼────────────┐
 │  Orchestrator Agent   │  (LLM-powered router)
-└──┬───┬───┬───┬───────┘
-   │   │   │   │
-   ▼   ▼   ▼   ▼
-  BK   RC   FC  ...   (specialist agents)
-   │
-   ▼
+│  ┌────────────────┐   │
+│  │ Agent Registry  │   │  auto-wires delegation tools
+│  └──┬───┬───┬─────┘   │
+└─────┼───┼───┼─────────┘
+      │   │   │
+      ▼   ▼   ▼
+   BK   RC   FC  ...   (specialist agents)
+                         each with own model + tools
+      │
+      ▼
 ┌────────────────┐
 │   Data Layer    │
 │  (SQLite +       │
@@ -105,8 +127,10 @@ CSV files with BOM, quoted fields, commas in amounts, empty rows, and currency s
 ```
 
 - **Orchestrator** is the only agent that talks to the user
-- Each specialist agent exposes typed Python **tools** (no raw SQL access)
-- All agent actions are logged in the `conversations` table for audit
+- **Agent Registry** in `src/agents/registry.py` auto-discovers and wires specialist agents as delegation tools
+- Each specialist agent (Bookkeeper, etc.) exposes typed Python **tools** backed by the DB layer
+- Per-agent model selection via `AUTOFI_{AGENT}_MODEL` env vars or DB-backed config
+- All agent actions are logged in the `ConversationMessage` table for audit
 
 ---
 
@@ -119,7 +143,8 @@ CSV files with BOM, quoted fields, commas in amounts, empty rows, and currency s
 | CLI framework | `click` |
 | ORM / DB | `sqlmodel` (SQLite) |
 | Agent framework | `pydantic-ai` |
-| LLM providers | Anthropic, OpenAI, Gemini (via env var) |
+| LLM providers | Anthropic, OpenAI, Gemini, Groq, OpenRouter (via env var or `autofi setup`) |
+| Encryption | `cryptography` (Fernet + PBKDF2 for API key storage) |
 
 ---
 
@@ -132,27 +157,41 @@ autofi/
 ├── src/
 │   ├── cli/                 # Click CLI commands
 │   │   ├── main.py          # Root `autofi` group
-│   │   ├── bank.py          # `bank import`, `bank list`
+│   │   ├── bank.py          # `bank import`, `bank list`, `bank add-account`
 │   │   ├── transactions.py  # `tx list`, `tx show`, `tx stats`
-│   │   └── chat.py          # `chat` command (WIP)
-│   ├── agents/              # AI agents (WIP)
-│   │   ├── orchestrator.py
-│   │   └── bookkeeper.py
+│   │   ├── chat.py          # `chat` command (single-turn + interactive REPL)
+│   │   └── setup.py         # `setup` command (interactive LLM config)
+│   ├── agents/              # AI agents
+│   │   ├── __init__.py      # Logging config
+│   │   ├── orchestrator.py  # Orchestrator agent (LLM-powered router)
+│   │   ├── bookkeeper.py    # Bookkeeper agent with DB tools
+│   │   ├── registry.py      # Agent registry & delegation tool factory
+│   │   ├── settings.py      # Per-agent model selection & API key resolution
+│   │   └── memory/          # (future) conversation memory
 │   ├── data/                # Database layer
-│   │   ├── models.py        # Account, Transaction, Conversation
-│   │   └── db.py            # Engine, sessions, init
+│   │   ├── models.py        # Account, Transaction, ConversationMessage, AppConfig
+│   │   ├── db.py            # Engine, sessions, init
+│   │   └── config.py        # AppConfig key-value store helpers
 │   └── util/                # Utilities
 │       ├── config.py        # XDG paths, env vars
 │       ├── csv_parser.py    # Format detection & parsing
-│       └── bank_feed_ingestion.py  # Import, dedup, stats
+│       ├── bank_feed_ingestion.py  # Import, dedup, stats
+│       └── crypto.py        # Fernet encryption for API key storage
 ├── docs/
 │   ├── SPEC.md              # Full spec & agent roles
 │   ├── project-state.md     # Current project reference
-│   └── plan/                # Feature plans
-└── tests/
-    ├── test_csv_parser.py   # CSV parser (23 tests)
-    ├── test_db.py           # Models & DB (7 tests)
-    └── test_ingestion.py    # Ingestion (13 tests)
+│   ├── release-plan.md      # Publishing plan
+│   ├── plan/                # Feature plans
+│   ├── work/                # Work tracking
+│   ├── research/            # Research docs
+│   └── test/                # Test results
+├── src/test/                # Legacy test suites
+│   ├── test_csv_parser.py   # CSV parser (23 tests)
+│   ├── test_db.py           # Models & DB (7 tests)
+│   └── test_ingestion.py    # Ingestion (13 tests)
+└── tests/                   # Current test suites
+    ├── test_bookkeeper_tools.py  # Bookkeeper agent tools (6 tests)
+    └── test_orchestrator.py      # Orchestrator delegation (3 tests)
 ```
 
 ---
