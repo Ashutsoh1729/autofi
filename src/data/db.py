@@ -1,7 +1,18 @@
 from collections.abc import Generator
 from pathlib import Path
 
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
+
+from data.seed import seed_gl_accounts
+
+
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_fk(dbapi_connection, _connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def get_engine(db_path: Path):
@@ -11,6 +22,7 @@ def get_engine(db_path: Path):
 def init_db(db_path: Path):
     engine = get_engine(db_path)
     SQLModel.metadata.create_all(engine)
+    seed_gl_accounts(engine)
     return engine
 
 

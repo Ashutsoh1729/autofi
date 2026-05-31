@@ -33,48 +33,48 @@ Once CSV ingestion is stable, add automated bank feed support:
 - [x] Create `src/data/db.py` with `get_session(db_path)` helper using `create_engine` + `Session`
 
 ### Step 3: CSV Parser
-- [ ] Create `src/util/csv_parser.py` with:
+- [x] Create `src/util/csv_parser.py` with:
   - `detect_format(headers: list[str]) -> CSVFormat` — auto-detect bank format by column headers
   - `parse_csv(filepath: str) -> list[RawTransaction]` — parse CSV into a canonical form
-- [ ] Support at least 3 common formats:
+- [x] Support at least 3 common formats:
   - **Generic**: columns like `Date`, `Description`, `Amount`, `Debit`, `Credit`
   - **HDFC Bank**: standard Indian bank export format
   - **Chase / US Bank**: common US format with `Transaction Date`, `Description`, `Amount`
-- [ ] Normalise: map all formats to (date, description, amount, currency, type)
-- [ ] Handle edge cases: BOM in CSV, quoted fields, commas in amounts, empty rows, headers with spaces
+- [x] Normalise: map all formats to (date, description, amount, currency, type)
+- [x] Handle edge cases: BOM in CSV, quoted fields, commas in amounts, empty rows, headers with spaces
 
 ### Step 4: Ingestion Service
-- [ ] Create `src/util/bank_feed_ingestion.py` implementing:
+- [x] Create `src/util/bank_feed_ingestion.py` implementing:
   - `import_csv(filepath: str, account_id: str | None = None) -> ImportResult` — parse CSV, dedup against existing, insert new rows, return summary (imported, skipped, errors)
   - `list_transactions(account_id: str | None, days: int | None, limit: int) -> list[Transaction]`
   - `get_transaction_stats() -> dict` — total count, per-account counts, date range
-- [ ] Compute a deterministic hash per row for dedup
-- [ ] Support `--dry-run` flag to show what would be imported without writing
-- [ ] Use SQLModel sessions for all DB operations (no raw SQL)
+- [x] Compute a deterministic hash per row for dedup
+- [x] Support `--dry-run` flag to show what would be imported without writing
+- [x] Use SQLModel sessions for all DB operations (no raw SQL)
 
 ### Step 5: CLI Root Command & Groups
-- [ ] Create root CLI group `autofi` in `src/cli/main.py` via `@click.group()`
-- [ ] Create `src/cli/bank.py` with `@bank.group()`:
+- [x] Create root CLI group `autofi` in `src/cli/main.py` via `@click.group()`
+- [x] Create `src/cli/bank.py` with `@bank.group()`:
   - `autofi bank import <csv-file> [--account-id] [--dry-run]` — import CSV, auto-create account if needed
   - `autofi bank list` — list accounts with transaction counts and date ranges
   - `autofi bank add-account <name> [--type] [--currency]` — manually add an account
-- [ ] Create `src/cli/transactions.py` with `@tx.group()`:
+- [x] Create `src/cli/transactions.py` with `@tx.group()`:
   - `autofi tx list [--account-id] [--days N] [--limit]` — list transactions
   - `autofi tx show <tx-id>` — show full transaction details
   - `autofi tx stats` — summary counts and date range
-- [ ] Register both sub-groups (`bank`, `tx`) onto the root `autofi` group in `src/cli/main.py`
-- [ ] Root `main.py` imports `autofi` group from `src/cli/main.py` and calls `autofi()` as entry point
+- [x] Register both sub-groups (`bank`, `tx`) onto the root `autofi` group in `src/cli/main.py`
+- [x] Root `main.py` imports `autofi` group from `src/cli/main.py` and calls `autofi()` as entry point
 
 ### Step 6: Validation & Error Handling
-- [ ] Validate CSV structure before parsing (non-empty, valid headers)
-- [ ] Report per-row errors with line numbers (e.g. unparseable date, negative amount)
-- [ ] Handle partial imports: import valid rows, report invalid rows, don't roll back valid ones
+- [x] Validate CSV structure before parsing (non-empty, valid headers)
+- [x] Report per-row errors with line numbers (e.g. unparseable date, negative amount)
+- [ ] Handle partial imports: import valid rows, report invalid rows, don't roll back valid ones *(current implementation rolls back entire batch on any error)*
 
 ### Step 7: Testing
-- [ ] Write unit tests for CSV parser with sample CSVs for each supported format
-- [ ] Write unit tests for ingestion service (dedup, dry-run, stats)
-- [ ] Write unit tests for CLI commands (invoke Click runner, assert output)
-- [ ] Test with real CSV exports from HDFC, Chase, and a generic format
+- [x] Write unit tests for CSV parser with sample CSVs for each supported format (`src/test/test_csv_parser.py`)
+- [x] Write unit tests for ingestion service (dedup, dry-run, stats) (`src/test/test_ingestion.py`)
+- [x] Write unit tests for CLI commands (invoke Click runner, assert output) (`src/test/test_cli.py`)
+- [x] Test with real CSV exports from HDFC, Chase, and a generic format (inline samples in test_csv_parser.py)
 
 ### Step 8: Future — Plaid Integration (not yet)
 - [ ] When ready: create `src/util/plaid_client.py` — Plaid API wrapper

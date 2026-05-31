@@ -55,23 +55,23 @@ Provider → model mapping (hardcoded):
 |----------|--------|
 | `anthropic` | `claude-sonnet-4-20250514`, `claude-opus-4-20250514`, `claude-3-5-sonnet-latest` |
 | `openai` | `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo` |
-| `google-gla` | `gemini-2.0-flash`, `gemini-2.0-flash-lite`, `gemini-1.5-pro`, `gemini-2.5-flash-preview-05-20` — ✨ Free tier: 1,500 req/day |
+| `google` | `gemini-2.5-flash` (recommended), `gemini-2.5-pro`, `gemini-2.5-flash-lite` |
 | `groq` | `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`, `llama-4-scout-17b-16e-instruct` — ✨ Free tier: 14,400 req/day |
-| `openrouter` | `meta-llama/llama-4-maverick:free`, `deepseek/deepseek-r1:free`, `qwen/qwen3-235b-a22b:free` — ✨ All free on OpenRouter |
+| `openrouter` | `deepseek/deepseek-v4-flash:free`, `moonshotai/kimi-k2.6:free` — ✨ All free on OpenRouter |
 
-Top 5 recommended free/good-tier models to highlight in setup:
-1. `gemini-2.5-flash-preview-05-20` — Google AI Studio, 1,500 req/day free
+Top recommended free/good-tier models to highlight in setup:
+1. `gemini-2.5-flash` — Google AI Studio, free tier, great speed & reasoning
 2. `llama-4-scout-17b-16e-instruct` — Groq, 14,400 req/day free, ultra-fast LPU
-3. `meta-llama/llama-4-maverick:free` — OpenRouter, free
-4. `deepseek/deepseek-r1:free` — OpenRouter, free, strong reasoning
-5. `qwen/qwen3-235b-a22b:free` — OpenRouter, free, massive MoE
+3. `deepseek/deepseek-v4-flash:free` — OpenRouter, free
+4. `moonshotai/kimi-k2.6:free` — OpenRouter, free
 
 Keys stored in DB:
-- `model` → full model string (e.g. `"google-gla:gemini-2.0-flash"`)
+- `model` → full model string (e.g. `"google:gemini-2.5-flash"`)
 - `api_key_anthropic` → encrypted key
 - `api_key_openai` → encrypted key
-- `api_key_google-gla` → encrypted key
+- `api_key_google` → encrypted key
 - `api_key_groq` → encrypted key
+- `api_key_openrouter` → encrypted key
 
 ### Step 5: Register setup command in main CLI
 

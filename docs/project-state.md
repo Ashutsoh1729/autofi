@@ -43,9 +43,11 @@ Autonomous AI agent system for SMB financial operations. Currently implementing 
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `docs/plan/ingestion/bank-feed-ingestion.md` | ~110 | Active plan for CSV-first bank feed ingestion |
+| `docs/plan/ingestion/bank-feed-ingestion.md` | ~106 | Active — CSV-first bank feed ingestion (partial imports + Plaid/AA future) |
+| `docs/plan/data/archive/data-models-next.md` | ~240 | ✅ Archived — Phase 2 data models |
 | `src/util/config.py` | 25 | Config: DB path, data dir, config dir |
-| `src/data/models.py` | 50 | SQLModel definitions: Account, Transaction, ConversationMessage, AppConfig |
+| `src/data/models.py` | 100+ | SQLModel definitions: Account, Transaction, ConversationMessage, AppConfig, GLAccount, Vendor, Customer, Invoice, InvoiceLineItem, Bill, BillLineItem, CategoryRule |
+| `src/data/seed.py` | 30 | Default chart of accounts seeding (19 GL accounts) |
 | `src/data/db.py` | 20 | DB engine + session helper |
 | `src/data/config.py` | 36 | **NEW** — AppConfig key-value helpers: `get_setting`, `set_setting`, `delete_setting` |
 | `src/util/csv_parser.py` | 217 | CSV format detection, parsing, RawTransaction |
@@ -56,8 +58,6 @@ Autonomous AI agent system for SMB financial operations. Currently implementing 
 | `src/cli/transactions.py` | 59 | CLI: `tx list`, `tx show`, `tx stats` |
 | `src/cli/setup.py` | 200 | **NEW** — Interactive `autofi setup` for LLM model + API key config |
 | `main.py` | 4 | CLI entry point — calls `autofi()` |
-| `tests/test_csv_parser.py` | 217 | Unit tests for CSV parser (all 4 formats) |
-| `tests/test_ingestion.py` | 150 | Unit tests for ingestion (dedup, dry-run, stats) |
 | `tests/test_db.py` | 149 | Existing tests for models and DB |
 
 ---
@@ -70,13 +70,24 @@ Autonomous AI agent system for SMB financial operations. Currently implementing 
 | `get_config_dir()` | Returns XDG-compliant config directory |
 | `get_data_dir()` | Returns XDG-compliant data directory |
 | `get_db_path()` | Returns path to SQLite DB, creates data dir if needed |
+| **Seed** | |
+| `seed_gl_accounts(engine)` | Seeds 19 default GLAccount rows; idempotent (no-op if table non-empty) |
 | **DB** | |
 | `get_engine(db_path)` | Creates SQLAlchemy engine for SQLite |
 | `init_db(db_path)` | Creates all tables via SQLModel metadata |
 | `get_session(db_path)` | Yields a SQLModel Session (context manager) |
 | **Models** | |
 | `ConversationMessage` | SQLModel table: id, conversation_id, role, content, created_at |
+| `GLAccount` | Chart of Accounts: code, name, type, parent_id, is_active |
+| `Vendor` | Payable counterparty: name, gstin, email, phone |
+| `Customer` | Receivable counterparty: name, gstin, email, phone |
+| `Invoice` / `InvoiceLineItem` | Sales invoice with cascading line items |
+| `Bill` / `BillLineItem` | Vendor bill with cascading line items |
+| `CategoryRule` | Auto-categorisation rule: pattern → gl_account_id |
 | `Transaction.compute_hash(date, desc, amount)` | SHA-256 dedup hash |
+| `Transaction.gl_account_id` | New nullable FK to GLAccount (what-for) |
+| `Transaction.invoice_id` | New nullable FK to Invoice (payment reconciliation) |
+| `Transaction.bill_id` | New nullable FK to Bill (payment reconciliation) |
 | **Agent Registry** | |
 | `register_agent(name, entry)` | Register a specialist agent with deps factory |
 | `wire_orchestrator_tools(orchestrator_agent)` | Auto-generate delegation tools for all registered agents |
@@ -108,6 +119,22 @@ Autonomous AI agent system for SMB financial operations. Currently implementing 
 | `autofi tx list` | List transactions (--account-id, --days, --limit) |
 | `autofi tx show <id>` | Full transaction details |
 | `autofi tx stats` | Summary counts and date range |
+| **Bookkeeper Agent — New Tools (Phase 2)** | |
+| `list_gl_accounts(acct_type)` | List chart of accounts, filtered by type |
+| `auto_categorise(tx_id)` | Auto-categorise by CategoryRule pattern matching |
+| `list_vendors(query)` | Search vendors by name |
+| `add_vendor(name, gstin, email, phone)` | Create vendor |
+| `list_customers(query)` | Search customers by name |
+| `add_customer(name, gstin, email, phone)` | Create customer |
+| `list_invoices(status)` | List invoices by status |
+| `show_invoice(id)` | Full invoice details with line items |
+| `list_bills(status)` | List bills by status |
+| `show_bill(id)` | Full bill details with line items |
+| `link_to_invoice(tx_id, invoice_id)` | Reconcile transaction to invoice |
+| `link_to_bill(tx_id, bill_id)` | Reconcile transaction to bill |
+| `find_unreconciled_transactions(limit)` | List transactions not yet matched to invoice/bill |
+| `suggest_matches(tx_id)` | Score and suggest candidate invoices/bills for a transaction |
+| `confirm_match(tx_id, doc_id, doc_type)` | Confirm match and update paid_amount on invoice/bill |
 
 ---
 
@@ -115,19 +142,26 @@ Autonomous AI agent system for SMB financial operations. Currently implementing 
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `docs/plan/agents/orchestrator-bookkeeper.md` | ~67 | Active plan for Orchestrator + Bookkeeper agents |
+| `docs/plan/agents/bookkeeper-reconciliation.md` | ~27 | Active plan — Reconciliation tools added to bookkeeper agent |
+| `docs/plan/agents/archive/orchestrator-bookkeeper.md` | ~67 | ✅ Archived — Orchestrator + Bookkeeper agents |
+| `docs/plan/agents/archive/orchestrator-agent-delegation.md` | ~103 | ✅ Archived — Sub-agent delegation pattern |
+| `docs/plan/agents/archive/bookkeeper-upgrade.md` | ~50 | ✅ Archived — Bookkeeper upgrade (full data model access) |
 | `docs/work/orchestrator-bookkeeper.md` | — | Work tracking file for agents |
 | `src/agents/__init__.py` | 7 | Logging config (basicConfig, INFO level) |
 | `src/agents/settings.py` | 55 | LLM model config: `AUTOFI_LLM_MODEL`, per-agent `AUTOFI_{AGENT}_MODEL` env vars, API key resolution |
-| `src/agents/bookkeeper.py` | 190 | Bookkeeper Pydantic AI agent with DB-backed tools |
+| `src/agents/bookkeeper.py` | ~220 | Bookkeeper Pydantic AI agent with DB-backed tools (GL accounts, vendors, customers, invoices, bills, reconciliation) |
 | `src/agents/orchestrator.py` | 65 | Orchestrator Pydantic AI agent with registry-based delegation to sub-agents |
 | `src/agents/registry.py` | 75 | Agent registry (`OrchestratorDeps`, `AgentEntry`, `register_agent()`, `_make_delegation_tool()`, `wire_orchestrator_tools()`) |
 | `src/cli/chat.py` | 106 | `autofi chat` CLI command (single-turn + interactive REPL) |
 | `src/cli/setup.py` | 200 | `autofi setup` — interactive LLM model + API key configuration |
 | `src/data/config.py` | 36 | AppConfig key-value store helpers |
 | `src/util/crypto.py` | 56 | Fernet encrypt/decrypt with PBKDF2 key derivation |
-| `tests/test_bookkeeper_tools.py` | 140 | Unit tests for bookkeeper tools (in-memory SQLite + TestModel) |
+| `tests/test_bookkeeper_tools.py` | ~480 | Unit tests for bookkeeper tools (GL accounts, auto-categorise, vendors, customers, invoices, bills, reconciliation, match suggestions) |
 | `tests/test_orchestrator.py` | 75 | Unit tests for orchestrator delegation (TestModel, multi-turn) |
+| `src/test/test_csv_parser.py` | 217 | Unit tests for CSV parser (all 4 formats, BOM, edge cases) |
+| `src/test/test_ingestion.py` | 139 | Unit tests for ingestion service (dedup, dry-run, stats, filters) |
+| `src/test/test_db.py` | 524 | Unit tests for all SQLModel models (CRUD, FKs, cascades, seeding, reconciliation) |
+| `src/test/test_cli.py` | ~200 | Unit tests for CLI commands (import, list, add-account, tx show, tx stats) |
 
 ---
 
